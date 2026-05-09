@@ -23,7 +23,7 @@ export function FreeResponseInput({
   return (
     <div className="space-y-2">
       {label ? (
-        <Label htmlFor={id} className="text-muted-foreground">
+        <Label htmlFor={id} className="text-foreground">
           {label}
         </Label>
       ) : null}

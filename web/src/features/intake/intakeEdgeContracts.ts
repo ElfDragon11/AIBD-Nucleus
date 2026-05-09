@@ -36,6 +36,8 @@ export type ProcessIntakeAnswerBody = {
   question: string
   /** Normalized combined answer text from quick pick + notes. */
   answer: string
+  /** Same key as last question's `field_target` (from message metadata); keeps static ladders in sync with profile rows. */
+  field_target?: string
 }
 
 export type ProcessIntakeAnswerResult = {
@@ -45,4 +47,26 @@ export type ProcessIntakeAnswerResult = {
   should_show_recommendations: boolean
   next_question: NextQuestionPayload | Record<string, never>
   candidate_match_count: number
+}
+
+/** find-matches */
+export type FindMatchesBody = {
+  lead_id: string
+  public_session_id: string
+  limit?: number
+}
+
+export type FindMatchesResult = {
+  matches: Array<{
+    matched_record_type: string
+    matched_record_id: string
+    card_title: string
+    match_kind_label: string
+    overall_score: number | null
+    confidence_label: string | null
+    why_this_fits: string
+    best_next_step: string
+    potential_gap: string | null
+  }>
+  message?: string
 }

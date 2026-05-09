@@ -40,3 +40,23 @@ export async function fetchLeadVerified(
   if (error || !data) return null
   return data as LeadRow
 }
+
+/** Verify Bearer JWT belongs to a row in public.admin_users (for staff-only Edge routes). */
+export async function getAdminUserFromRequest(
+  supabase: SupabaseClient,
+  req: Request,
+): Promise<{ authUserId: string } | null> {
+  const auth = req.headers.get('Authorization')
+  if (!auth?.startsWith('Bearer ')) return null
+  const jwt = auth.slice(7)
+  const { data: userData, error: userErr } = await supabase.auth.getUser(jwt)
+  if (userErr || !userData.user) return null
+  const uid = userData.user.id
+  const { data: row } = await supabase
+    .from('admin_users')
+    .select('id')
+    .eq('auth_user_id', uid)
+    .maybeSingle()
+  if (!row) return null
+  return { authUserId: uid }
+}

@@ -26,17 +26,20 @@ export function IdentityStep({ submitting, onSubmit }: Props): JSX.Element {
 
   return (
     <form
-      className="mx-auto flex w-full max-w-lg flex-col gap-6"
+      className="flex w-full flex-col gap-6"
       onSubmit={form.handleSubmit(onSubmit)}
       noValidate
     >
       <div className="text-left">
-        <h2 className="font-serif text-2xl tracking-tight sm:text-3xl">
+        <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-[var(--nucleus-blue)]">
+          Start intake
+        </p>
+        <h2 className="font-serif text-2xl font-medium tracking-tight sm:text-3xl">
           Tell us who you are
         </h2>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4">
         <div className="grid gap-1.5">
           <Label htmlFor="first_name">First name</Label>
           <Input id="first_name" autoComplete="given-name" {...form.register('first_name')} aria-invalid={!!form.formState.errors.first_name || undefined} />

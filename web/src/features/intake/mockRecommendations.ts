@@ -1,4 +1,4 @@
-export type MockRecommendation = {
+export type MatchCardItem = {
   title: string
   matchKind: string
   whyThisFits: string
@@ -6,9 +6,14 @@ export type MockRecommendation = {
   confidenceLabel: 'High' | 'Medium-high' | 'Medium' | 'Exploratory'
   potentialGap?: string | null
   iconKind?: 'mentor' | 'operator' | 'program'
+  /** Present when this card came from `match_records` (CRM-linked request). */
+  matchRecordId?: string | null
 }
 
-/** Static cards until Phase 5 writes `match_records`. */
+/** @deprecated use MatchCardItem */
+export type MockRecommendation = MatchCardItem
+
+/** Static cards for tests / storybook. */
 export function getMockRecommendationCards(
   primaryTypeSlug: string | null,
 ): MockRecommendation[] {
@@ -143,5 +148,49 @@ export function getMockRecommendationCards(
           iconKind: 'operator',
         },
       ]
+  }
+}
+
+function normalizeConfidence(
+  raw: string | null | undefined,
+): MatchCardItem['confidenceLabel'] {
+  const s = (raw ?? '').trim()
+  if (
+    s === 'High' ||
+    s === 'Medium-high' ||
+    s === 'Medium' ||
+    s === 'Exploratory'
+  ) {
+    return s
+  }
+  return 'Medium'
+}
+
+/** Map `list_match_records_for_session` row → card props. */
+export function matchRpcRowToCard(input: {
+  match_id: string
+  card_title: string
+  match_kind_label: string
+  why_this_fits: string | null
+  best_next_step: string | null
+  confidence_label: string | null
+  potential_gap: string | null
+  icon_kind: string
+}): MatchCardItem {
+  const icon = input.icon_kind?.trim()
+  let iconKind: MatchCardItem['iconKind']
+  if (icon === 'operator' || icon === 'program' || icon === 'mentor') {
+    iconKind = icon
+  }
+
+  return {
+    matchRecordId: input.match_id,
+    title: input.card_title,
+    matchKind: input.match_kind_label,
+    whyThisFits: input.why_this_fits ?? '',
+    bestNextStep: input.best_next_step ?? '',
+    confidenceLabel: normalizeConfidence(input.confidence_label),
+    potentialGap: input.potential_gap,
+    iconKind,
   }
 }

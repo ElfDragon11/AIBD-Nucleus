@@ -107,3 +107,42 @@ export async function listLeadProfileFieldsForSession(
   if (error) throw error
   return data ?? []
 }
+
+export type MatchRecordSessionRow =
+  Database['public']['Functions']['list_match_records_for_session']['Returns'][number]
+
+export async function listMatchRecordsForSession(
+  leadId: string,
+  publicSessionId: string,
+): Promise<MatchRecordSessionRow[]> {
+  const { data, error } = await supabase.rpc(
+    'list_match_records_for_session',
+    {
+      p_lead_id: leadId,
+      p_public_session_id: publicSessionId,
+    },
+  )
+  if (error) throw error
+  return data ?? []
+}
+
+export async function createIntroductionRequest(input: {
+  leadId: string
+  publicSessionId: string
+  requestKind: 'intro_meeting' | 'program_intro' | 'working_session_intro'
+  targetTitle: string
+  matchRecordId?: string | null
+}): Promise<string> {
+  const { data, error } = await supabase.rpc('create_introduction_request', {
+    p_lead_id: input.leadId,
+    p_public_session_id: input.publicSessionId,
+    p_request_kind: input.requestKind,
+    p_target_title: input.targetTitle,
+    p_match_record_id: input.matchRecordId ?? null,
+  })
+  if (error) throw error
+  if (typeof data !== 'string' || !data) {
+    throw new Error('create_introduction_request did not return an id')
+  }
+  return data
+}

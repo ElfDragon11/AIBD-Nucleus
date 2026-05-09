@@ -41,6 +41,197 @@ This is not a full CRM replacement. It is a focused workflow layer that improves
 
 ---
 
+## 2.1 Nucleus Brand Alignment Plan
+
+The Concierge product should look like it belongs inside the existing Nucleus Utah site, not like a separate SaaS app. The current Nucleus site is built in Squarespace, but the visual system can be replicated cleanly in our React/Tailwind app through shared design tokens, a site-style header, and restrained page composition.
+
+Sources reviewed:
+
+- https://www.nucleusutah.org/
+- https://www.nucleusutah.org/contact
+- Public Squarespace CSS and metadata loaded by those pages
+
+### 2.1.1 Brand Assets
+
+Use the Nucleus wordmark in the app header and on the public intake entry page.
+
+Primary logo asset:
+
+> `https://images.squarespace-cdn.com/content/v1/681936f274ae5b3fa16b8c1d/0a303644-2c8c-499f-b072-31a18b55d4dc/Wordmark_Blue.png`
+
+Related public brand assets found on the site:
+
+- `Wordmark_Blue.png` for light backgrounds
+- `icon on blue field.png` as the social/share image
+- `NucleusGrow_White.png` and `NucleusMarketEdge_White.png` for white sub-brand marks on dark/blue fields
+- Light and dark favicon `.ico` assets served from the same Squarespace CDN account
+
+Implementation notes:
+
+- Add the wordmark as a local asset in `web/src/assets/brand/` or reference the CDN during prototype work.
+- Prefer local assets before final delivery so the app is not dependent on Squarespace image URLs.
+- Keep the logo large enough to read. Their Squarespace header uses a 120px desktop logo height setting and 58px mobile max height, so our header should use a wide wordmark treatment rather than a tiny nav label.
+
+### 2.1.2 Typography
+
+The live Nucleus site loads Google Fonts:
+
+```css
+Poppins: 400, 700
+Manrope: 500, 700
+```
+
+Observed CSS roles:
+
+- Headings: `Manrope`, weight `500`, line-height `1.2`, letter-spacing `-0.02em`
+- Body text: `Poppins`, weight `400`, line-height `1.5`
+- Meta/nav/buttons: `Poppins`, weight `400`, line-height `1.2` to `1.5`
+- Base font size: `16px`
+
+Recommended app mapping:
+
+- Replace the current serif landing-page treatment with `Manrope`.
+- Use `Poppins` globally for body, inputs, buttons, nav, labels, table text, and admin UI.
+- Use `Manrope` for public-page hero headings, section headings, card titles, empty-state titles, and admin page titles.
+- Avoid heavy display typography. The Nucleus site feels modern, institutional, and clean, not decorative.
+
+Recommended type scale:
+
+- Hero / H1: `clamp(2.5rem, 5vw, 4rem)`
+- H2: `clamp(2rem, 3vw, 2.8rem)`
+- H3: `2.2rem`
+- H4 / card title: `1.6rem`
+- Large body: `1.25rem` to `1.4rem`
+- Body: `1rem`
+- Small/meta: `0.875rem` to `0.9rem`
+
+### 2.1.3 Color System
+
+Extracted CSS variables from the live site:
+
+```css
+--white-hsl: 0, 0%, 100%;                 /* #ffffff */
+--lightAccent-hsl: 204, 83.33%, 97.65%;   /* #f4fafe */
+--accent-hsl: 211.72, 56.13%, 69.61%;     /* #86afdd */
+--darkAccent-hsl: 217, 100%, 37%;         /* #0048bd */
+--black-hsl: 240, 1.75%, 11.18%;          /* #1c1c1d */
+--form-field-fill: 207.43, 100%, 93.14%;  /* #dcefff */
+```
+
+Recommended app tokens:
+
+```css
+:root {
+  --nucleus-ink: #1c1c1d;
+  --nucleus-white: #ffffff;
+  --nucleus-mist: #f4fafe;
+  --nucleus-sky: #dcefff;
+  --nucleus-blue: #0048bd;
+  --nucleus-blue-soft: #86afdd;
+}
+```
+
+Use colors this way:
+
+- Public page background: mostly white, with light blue section bands.
+- Main text: `#1c1c1d`.
+- Primary actions: black/ink background with white text, matching the site button defaults.
+- Secondary accents: Nucleus blue for links, progress states, selected options, and subtle emphasis.
+- Form fields: very light blue fill (`#dcefff`) with dark borders or focus rings.
+- Admin UI: white/near-white canvas with blue highlights, not a generic gray SaaS palette.
+
+Do not overuse blue. The current site is mostly white and black with blue as brand signal and atmospheric support.
+
+### 2.1.4 Layout And Component Language
+
+The live site is spacious, direct, and section-based:
+
+- Full-width white and pale-blue sections
+- Large wordmark in the header
+- Simple top navigation
+- Big, confident headings
+- Minimal cards
+- Square or nearly square corners
+- Buttons with simple solid fills
+- Underline hover treatment on nav links
+- Fade/slide page animations with a roughly `0.6s` duration
+
+Apply this to Concierge:
+
+1. Add a Nucleus-style public header.
+   - Left: Nucleus wordmark.
+   - Right: restrained links such as `About Nucleus`, `Admin`, and primary CTA.
+   - Use white background and enough vertical padding to feel related to the current site.
+
+2. Rework the public landing page.
+   - Replace centered generic SaaS text with a Nucleus-branded page section.
+   - Use headline language that fits as a natural page on their site:
+     > Connect with the right people in Utah's innovation ecosystem.
+   - Keep the explanation concise and human.
+   - Use one primary CTA: `Start the concierge intake`.
+
+3. Rework intake screens as a branded contact/intake page.
+   - Use a narrow content column inside a larger white or pale-blue section.
+   - Forms should use pale-blue field fills and clear black labels.
+   - Progress should feel quiet and editorial, not gamified.
+   - Keep cards flat with thin borders and 0 to 8px radius.
+
+4. Rework recommendation reveal.
+   - Present matches as curated introductions rather than algorithmic results.
+   - Use headings like `Recommended next connections`.
+   - Include short rationale blocks with clear admin-review language.
+
+5. Rework admin shell more conservatively.
+   - Admin should inherit fonts, colors, logo, and buttons.
+   - Keep information density higher than the public side.
+   - Use blue only for active nav, selected status, and important action affordances.
+
+### 2.1.5 Implementation Checklist
+
+Brand tokens:
+
+- Import Google Fonts in `web/src/index.css` or `web/index.html`.
+- Set `body` to `Poppins`.
+- Add a heading utility or base styles that use `Manrope`.
+- Replace current shadcn neutral tokens with Nucleus-derived `oklch` or hex/HSL tokens.
+- Keep Tailwind/shadcn variables mapped so existing components inherit the brand.
+
+Assets:
+
+- Add `web/src/assets/brand/nucleus-wordmark-blue.png`.
+- Add favicon later if this app is deployed as a standalone subdomain.
+- Create a `BrandMark` component so public and admin headers use the same asset.
+
+Shared components:
+
+- Create `PublicSiteHeader`.
+- Create `PublicPageShell`.
+- Create `NucleusSection` variants for white and pale-blue bands.
+- Update `Button` variants so primary equals ink/white and secondary equals white/ink with thin border.
+
+Public pages:
+
+- Update `LandingPage.tsx`.
+- Update `IntakeShell.tsx`.
+- Update `IntentStep.tsx`, `QuestionCard.tsx`, `FreeResponseInput.tsx`, `QuickSelectOptions.tsx`, and `ProgressIndicator.tsx`.
+- Update `RecommendationReveal.tsx` and `RecommendationCard.tsx`.
+
+Admin pages:
+
+- Update `AdminLayout.tsx` and `AdminSidebar.tsx`.
+- Bring admin tables/cards into the same typography and token system.
+- Avoid marketing-page scale inside admin screens; use the brand quietly.
+
+QA:
+
+- Compare the app against the live Nucleus home and contact pages at desktop and mobile widths.
+- Check that the wordmark is crisp and not distorted.
+- Confirm buttons, inputs, and links match the live site's simple black/blue behavior.
+- Verify contrast for pale-blue fields and blue links.
+- Run `npm run build` before handoff.
+
+---
+
 ## 3. Core User Types
 
 The system should support several different incoming lead types.

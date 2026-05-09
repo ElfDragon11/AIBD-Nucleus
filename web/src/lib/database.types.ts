@@ -51,6 +51,7 @@ export interface Database {
           raw_intent: string | null
           profile_confidence: number | null
           bad_fit_risk: string | null
+          intro_draft: string | null
           created_at: string
           updated_at: string
         }
@@ -70,6 +71,7 @@ export interface Database {
           raw_intent?: string | null
           profile_confidence?: number | null
           bad_fit_risk?: string | null
+          intro_draft?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -89,6 +91,7 @@ export interface Database {
           raw_intent?: string | null
           profile_confidence?: number | null
           bad_fit_risk?: string | null
+          intro_draft?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -235,6 +238,7 @@ export interface Database {
           need_types: string[] | null
           status: string
           source: string
+          contact_email: string | null
           embedding_text: string | null
           embedding: string | null
           created_at: string
@@ -251,6 +255,7 @@ export interface Database {
           need_types?: string[] | null
           status?: string
           source?: string
+          contact_email?: string | null
           embedding_text?: string | null
           embedding?: string | null
           created_at?: string
@@ -267,6 +272,7 @@ export interface Database {
           need_types?: string[] | null
           status?: string
           source?: string
+          contact_email?: string | null
           embedding_text?: string | null
           embedding?: string | null
           created_at?: string
@@ -289,6 +295,8 @@ export interface Database {
           potential_gap: string | null
           score_breakdown: Json | null
           status: string
+          intro_email_draft: string | null
+          intro_sent_at: string | null
           created_at: string
           updated_at: string
         }
@@ -306,6 +314,8 @@ export interface Database {
           potential_gap?: string | null
           score_breakdown?: Json | null
           status?: string
+          intro_email_draft?: string | null
+          intro_sent_at?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -323,6 +333,8 @@ export interface Database {
           potential_gap?: string | null
           score_breakdown?: Json | null
           status?: string
+          intro_email_draft?: string | null
+          intro_sent_at?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -430,6 +442,57 @@ export interface Database {
         }
         Relationships: []
       }
+      introduction_requests: {
+        Row: {
+          id: string
+          lead_id: string
+          match_record_id: string | null
+          request_kind: string
+          target_title: string
+          matched_record_type: string | null
+          matched_record_id: string | null
+          status: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          lead_id: string
+          match_record_id?: string | null
+          request_kind: string
+          target_title: string
+          matched_record_type?: string | null
+          matched_record_id?: string | null
+          status?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          lead_id?: string
+          match_record_id?: string | null
+          request_kind?: string
+          target_title?: string
+          matched_record_type?: string | null
+          matched_record_id?: string | null
+          status?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'introduction_requests_lead_id_fkey'
+            columns: ['lead_id']
+            isOneToOne: false
+            referencedRelation: 'leads'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'introduction_requests_match_record_id_fkey'
+            columns: ['match_record_id']
+            isOneToOne: false
+            referencedRelation: 'match_records'
+            referencedColumns: ['id']
+          },
+        ]
+      }
     }
     Views: Record<string, never>
     Functions: {
@@ -493,6 +556,32 @@ export interface Database {
       list_lead_profile_fields_for_session: {
         Args: { p_lead_id: string; p_public_session_id: string }
         Returns: Database['public']['Tables']['lead_profile_fields']['Row'][]
+      }
+      list_match_records_for_session: {
+        Args: { p_lead_id: string; p_public_session_id: string }
+        Returns: {
+          match_id: string
+          matched_record_type: string
+          overall_score: number | null
+          confidence_label: string | null
+          why_this_fits: string | null
+          best_next_step: string | null
+          potential_gap: string | null
+          score_breakdown: Json | null
+          card_title: string
+          match_kind_label: string
+          icon_kind: string
+        }[]
+      }
+      create_introduction_request: {
+        Args: {
+          p_lead_id: string
+          p_public_session_id: string
+          p_request_kind: string
+          p_target_title: string
+          p_match_record_id?: string | null
+        }
+        Returns: string
       }
     }
     Enums: Record<string, never>

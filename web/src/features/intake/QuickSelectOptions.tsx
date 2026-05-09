@@ -30,9 +30,9 @@ export function QuickSelectOptions({
           <label
             key={opt}
             className={cn(
-              'flex cursor-pointer flex-col rounded-xl border px-4 py-3 text-left text-sm shadow-sm outline-none ring-foreground/10 transition hover:bg-muted/50',
+              'flex cursor-pointer flex-col rounded-md border px-4 py-3 text-left text-sm outline-none ring-ring/15 transition hover:bg-secondary',
               picked
-                ? 'border-foreground/30 bg-muted/60 ring-2'
+                ? 'border-[var(--nucleus-blue)] bg-accent ring-2'
                 : 'border-border bg-card',
               disabled && 'cursor-not-allowed opacity-55',
             )}

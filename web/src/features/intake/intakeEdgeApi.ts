@@ -1,6 +1,8 @@
 import type {
   ClassifyLeadBody,
   ClassifyLeadResult,
+  FindMatchesBody,
+  FindMatchesResult,
   ProcessIntakeAnswerBody,
   ProcessIntakeAnswerResult,
 } from '@/features/intake/intakeEdgeContracts'
@@ -43,4 +45,18 @@ export async function processIntakeAnswerEdge(
     throw new Error('process-intake-answer returned an invalid payload')
   }
   return r
+}
+
+export async function findMatchesEdge(
+  input: FindMatchesBody,
+): Promise<FindMatchesResult> {
+  const { data, error } = await supabase.functions.invoke<FindMatchesResult>(
+    'find-matches',
+    { body: input },
+  )
+  if (error) throw unwrapFnError('find-matches', error)
+  if (!data || !Array.isArray(data.matches)) {
+    throw new Error('find-matches returned an invalid payload')
+  }
+  return data
 }

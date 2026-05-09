@@ -1,3 +1,4 @@
+import { IGNORE_COLUMN } from './csv_target_schema.ts'
 import {
   ALLOWED_PROFILE_FIELD_KEYS,
   CANONICAL_LEAD_TYPES,
@@ -15,9 +16,11 @@ Return a single JSON object only. Do not invent facts — use null or empty arra
 Allowed primary_type and secondary_types values (exact slugs): ${SLUG_LIST}
 Every lead has exactly one primary_type and zero or more secondary_types from this list only.
 
+confidence must be a JSON number between 0 and 1 (not a string).
+
 Include first_followup_question: a natural next question with 2-5 short quick-pick options, field_target using snake_case keys like sector, stage, needs, commercialization_goal, ip_status, role_interest, availability, expertise, etc.
 
-Set allow_free_response true and allow_unsure true unless there is a strong reason not to.`
+Set allow_free_response true and allow_unsure true unless there is a strong reason not to. secondary_types MUST be an array of slugs when present (never a bare string or object).`
 }
 
 export function buildClassifyUserPayload(input: {
@@ -91,4 +94,82 @@ export function filterSecondaryTypes(types: string[] | null | undefined): string
   if (!types?.length) return []
   const allowed = new Set(CANONICAL_LEAD_TYPES as readonly string[])
   return types.filter((t) => allowed.has(t))
+}
+
+export type FindMatchCandidateBrief = {
+  kind: 'person' | 'opportunity'
+  id: string
+  title: string
+  summary: string
+  structured_score: number
+}
+
+export function buildFindMatchesMessages(input: {
+  leadSummary: string
+  leadType: string
+  candidates: FindMatchCandidateBrief[]
+}): { role: 'system' | 'user'; content: string }[] {
+  const allowed = input.candidates.map((c) => `${c.kind}:${c.id}`).join(', ')
+  const lines = input.candidates
+    .map(
+      (c) =>
+        `- (${c.kind}:${c.id}) ${c.title} — ${c.summary.slice(0, 220)} (pre-score ${c.structured_score})`,
+    )
+    .join('\n')
+
+  return [
+    {
+      role: 'system',
+      content:
+        `You rank and explain match recommendations for Nucleus Connections Hub.
+Rules:
+- Output strict JSON only: { "final_matches": [ ... ] } — no other top-level keys.
+- Each item: { "kind": "person" | "opportunity", "id": "<uuid>", "why_this_fits": string, "best_next_step": string, "potential_gap": string | null, "confidence_label": "High" | "Medium-high" | "Medium" | "Exploratory" }
+- You MUST NOT invent people or opportunities. Every id in final_matches must appear in the candidate list below.
+- Use only these candidate keys: ${allowed}
+- Return between 2 and 4 items in final_matches (prefer 3-4 when helpful).
+- why_this_fits: 2-3 sentences, concrete and honest; mention gaps in potential_gap when relevant.
+- best_next_step: one practical next action (usually a short meeting or artifact).`,
+    },
+    {
+      role: 'user',
+      content: `Lead primary type: ${input.leadType}
+
+Lead context:
+${input.leadSummary}
+
+Candidates (choose only from this list):
+${lines}`,
+    },
+  ]
+}
+
+export function buildMapCsvSystemPrompt(targetSchemaJson: string): string {
+  return `You map CRM CSV columns to Nucleus Concierge database fields.
+Return one JSON object only with keys: detected_import_type, column_mapping, confidence (0-1 number), requires_review (string array of CSV headers that need human confirmation).
+
+detected_import_type: "people" for contact/person rows (names, emails, roles). "opportunities" for deals, programs, mandates, startup needs, or org-level opportunities.
+
+column_mapping: object whose keys are EXACT CSV header strings from the input, and values are ONE of:
+- A target field key from the schema below for the chosen detected_import_type
+- The literal string "${IGNORE_COLUMN}" for columns that should not be imported
+
+Every CSV header from the input must appear exactly once as a key in column_mapping. Use "${IGNORE_COLUMN}" for useless columns.
+
+confidence: your overall confidence in the mapping (number 0-1).
+
+requires_review: headers where you are unsure of the mapping or the column mixes multiple concepts.
+
+Target schema (field key → metadata):
+${targetSchemaJson}`
+}
+
+export function buildMapCsvUserPayload(input: {
+  headers: string[]
+  sample_rows: Record<string, unknown>[]
+}): string {
+  return JSON.stringify({
+    headers: input.headers,
+    sample_rows: input.sample_rows,
+  })
 }

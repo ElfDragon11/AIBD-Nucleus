@@ -1,5 +1,5 @@
 -- Nucleus Concierge — Phase 2 seed data (demo paths: researcher, operator, student; investor stretch).
--- pgvector: embeddings are NULL until Phase 5 backfill; Postgres must have extension enabled (see migrations).
+-- pgvector: embeddings are NULL until you run `deno run -A supabase/scripts/backfill-embeddings.ts` (OPENAI_API_KEY + Supabase service role env).
 --
 -- Admin bootstrap:
 --   • Preferred: `/admin/signup` in the app + confirm email when required → trigger creates `admin_users`.

@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:ital,wght@0,500;0,700&family=Poppins:ital,wght@0,400;0,700;1,400;1,700&display=swap');
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
@@ -36,6 +37,8 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --font-sans: var(--font-body);
+  --font-serif: var(--font-heading);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -46,38 +49,46 @@
 }
 
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --font-body: 'Poppins', ui-sans-serif, system-ui, sans-serif;
+  --font-heading: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+  --nucleus-ink: #1c1c1d;
+  --nucleus-white: #ffffff;
+  --nucleus-mist: #f4fafe;
+  --nucleus-sky: #dcefff;
+  --nucleus-blue: #0048bd;
+  --nucleus-blue-soft: #86afdd;
+  --radius: 0.45rem;
+  --background: var(--nucleus-white);
+  --foreground: var(--nucleus-ink);
+  --card: var(--nucleus-white);
+  --card-foreground: var(--nucleus-ink);
+  --popover: var(--nucleus-white);
+  --popover-foreground: var(--nucleus-ink);
+  --primary: var(--nucleus-ink);
+  --primary-foreground: var(--nucleus-white);
+  --secondary: var(--nucleus-mist);
+  --secondary-foreground: var(--nucleus-ink);
+  --muted: var(--nucleus-mist);
+  --muted-foreground: color-mix(in srgb, var(--nucleus-ink) 62%, white);
+  --accent: var(--nucleus-sky);
+  --accent-foreground: var(--nucleus-ink);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --border: color-mix(in srgb, var(--nucleus-blue-soft) 36%, white);
+  --input: color-mix(in srgb, var(--nucleus-blue-soft) 46%, white);
+  --ring: var(--nucleus-blue);
+  --chart-1: var(--nucleus-blue);
+  --chart-2: var(--nucleus-blue-soft);
+  --chart-3: var(--nucleus-ink);
+  --chart-4: var(--nucleus-sky);
+  --chart-5: var(--nucleus-mist);
+  --sidebar: var(--nucleus-mist);
+  --sidebar-foreground: var(--nucleus-ink);
+  --sidebar-primary: var(--nucleus-blue);
+  --sidebar-primary-foreground: var(--nucleus-white);
+  --sidebar-accent: var(--nucleus-sky);
+  --sidebar-accent-foreground: var(--nucleus-blue);
+  --sidebar-border: color-mix(in srgb, var(--nucleus-blue-soft) 36%, white);
+  --sidebar-ring: var(--nucleus-blue);
 }
 
 .dark {
@@ -120,6 +131,28 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-body);
   }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  .font-serif {
+    font-family: var(--font-heading);
+    letter-spacing: -0.02em;
+  }
+
+  a {
+    text-underline-offset: 0.22em;
+  }
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 380ms;
+  animation-timing-function: cubic-bezier(0.33, 1, 0.68, 1);
 }

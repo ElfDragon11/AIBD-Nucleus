@@ -32,9 +32,12 @@ export function QuestionCard({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="flex w-full flex-col gap-6">
       <div className="space-y-2">
-        <h2 className="text-balance text-2xl font-serif tracking-tight sm:text-[1.75rem]">
+        <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--nucleus-blue)]">
+          Concierge question
+        </p>
+        <h2 className="text-balance font-serif text-2xl font-medium tracking-tight sm:text-[1.75rem]">
           {question.question}
         </h2>
         <p className="text-sm text-muted-foreground">
@@ -60,7 +63,7 @@ export function QuestionCard({
         size="lg"
         disabled={submitting || (!picked && notes.trim().length === 0)}
         onClick={handleContinue}
-        className="w-full max-w-xl"
+        className="w-full"
       >
         {submitting ? (
           <>

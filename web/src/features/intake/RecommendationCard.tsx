@@ -1,67 +1,104 @@
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { useMutation } from '@tanstack/react-query'
+import { CheckIcon } from 'lucide-react'
+import { useState } from 'react'
 
-import type { MockRecommendation } from '@/features/intake/mockRecommendations'
-
-function KindBadge({
-  iconKind,
-}: Pick<MockRecommendation, 'iconKind'>) {
-  const label =
-    iconKind === 'operator'
-      ? 'Operator pathway'
-      : iconKind === 'program'
-        ? 'Program cohort'
-        : 'Human-led intro'
-
-  return (
-    <span className="rounded-md border border-foreground/10 bg-muted/50 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">
-      {label}
-    </span>
-  )
-}
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  deriveIntroRequestKind,
+  introRequestButtonLabel,
+} from '@/features/intake/introActions'
+import type { MatchCardItem } from '@/features/intake/mockRecommendations'
+import { createIntroductionRequest } from '@/features/intake/publicLeadApi'
 
 type Props = {
-  item: MockRecommendation
+  item: MatchCardItem
+  leadId: string
+  publicSessionId: string
 }
 
-export function RecommendationCard({ item }: Props) {
+export function RecommendationCard({
+  item,
+  leadId,
+  publicSessionId,
+}: Props) {
+  const [submitted, setSubmitted] = useState(false)
+  const kind = deriveIntroRequestKind(item)
+  const label = introRequestButtonLabel(kind)
+
+  const requestMutation = useMutation({
+    mutationFn: async () => {
+      await createIntroductionRequest({
+        leadId,
+        publicSessionId,
+        requestKind: kind,
+        targetTitle: item.title,
+        matchRecordId: item.matchRecordId ?? null,
+      })
+    },
+    onSuccess: () => setSubmitted(true),
+  })
+
   return (
-    <Card size="sm" className="border-border/80 bg-card/90">
+    <Card size="sm" className="border-border bg-card">
       <CardHeader className="border-b border-border/60 pb-3">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <CardTitle>{item.title}</CardTitle>
-          <KindBadge iconKind={item.iconKind} />
-        </div>
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        <CardTitle>{item.title}</CardTitle>
+        <p className="text-xs font-bold uppercase tracking-wide text-[var(--nucleus-blue)]">
           {item.matchKind}
         </p>
       </CardHeader>
       <CardContent className="space-y-3 pt-3 text-[0.95rem] leading-relaxed">
         <div className="space-y-1">
-          <span className="text-xs uppercase tracking-wide text-muted-foreground">
+          <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
             Why this fits
           </span>
           <p>{item.whyThisFits}</p>
         </div>
-        <div className="space-y-1">
-          <span className="text-xs uppercase tracking-wide text-muted-foreground">
+        <div className="space-y-3">
+          <span className="block text-xs font-bold uppercase tracking-wide text-muted-foreground">
             Best next step
           </span>
-          <p>{item.bestNextStep}</p>
+          <p className="text-[0.95rem] leading-relaxed">{item.bestNextStep}</p>
+          <div className="flex flex-col items-stretch gap-2 pt-1">
+            <Button
+              type="button"
+              size="sm"
+              className="w-full sm:w-auto sm:self-start"
+              disabled={submitted || requestMutation.isPending}
+              onClick={() => requestMutation.mutate()}
+            >
+              {requestMutation.isPending ? (
+                'Submitting…'
+              ) : submitted ? (
+                <>
+                  <CheckIcon className="mr-1.5 size-4" aria-hidden />
+                  Requested
+                </>
+              ) : (
+                label
+              )}
+            </Button>
+            {submitted ? (
+              <p className="text-sm text-muted-foreground">
+                We will email you soon.
+              </p>
+            ) : null}
+            {requestMutation.isError ? (
+              <p className="text-sm text-destructive" role="alert">
+                Could not submit right now. Please try again in a moment.
+              </p>
+            ) : null}
+          </div>
         </div>
-      </CardContent>
-      <CardFooter className="flex flex-col items-start gap-2 rounded-b-xl">
-        <p className="text-sm font-medium">
-          Confidence:&nbsp;<span className="text-foreground">{item.confidenceLabel}</span>
-        </p>
         {item.potentialGap ? (
-          <div className="space-y-1 text-sm text-muted-foreground">
-            <span className="text-xs uppercase tracking-wide">
+          <div className="space-y-1 border-t border-border/60 pt-3 text-sm text-muted-foreground">
+            <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
               Potential gap
             </span>
-            <p>{item.potentialGap}</p>
+            <p className="text-[0.95rem] leading-relaxed">{item.potentialGap}</p>
           </div>
         ) : null}
-      </CardFooter>
+      </CardContent>
     </Card>
   )
 }

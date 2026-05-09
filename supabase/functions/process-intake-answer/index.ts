@@ -5,6 +5,7 @@ import type { ProcessIntakeLlmOut } from '../_shared/schemas.ts'
 
 import { corsHeaders, jsonResponse } from '../_shared/cors.ts'
 import { appendMessage, upsertProfileFieldRow } from '../_shared/db_writes.ts'
+import { edgeErrorObj, edgeLog, edgeWarn, previewText } from '../_shared/edge_logger.ts'
 import {
   pickFallbackQuestion,
   normalizePrimaryType,
@@ -19,7 +20,7 @@ import {
   buildProcessUserPayload,
   coerceNextQuestion,
 } from '../_shared/prompts.ts'
-import { processIntakeLlmSchema } from '../_shared/schemas.ts'
+import { processIntakeLlmSchema, type NextQuestion } from '../_shared/schemas.ts'
 import {
   createServiceClient,
   fetchLeadVerified,
@@ -48,11 +49,14 @@ async function loadProfileFieldKeys(
   return new Set((data ?? []).map((r) => r.field_key))
 }
 
+const FN = 'process-intake-answer'
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
   if (req.method !== 'POST') {
+    edgeWarn(FN, 'method_not_allowed', { method: req.method })
     return jsonResponse({ error: 'Method not allowed' }, 405)
   }
 
@@ -62,12 +66,15 @@ Deno.serve(async (req: Request) => {
       public_session_id?: string
       question?: string
       answer?: string
+      /** Profile key tied to the question being answered — ensures ladder advances when the LLM omits extraction */
+      field_target?: string
     }
     const leadId = body.lead_id?.trim()
     const sessionId = body.public_session_id?.trim()
     const question = body.question?.trim()
     const answer = body.answer?.trim()
     if (!leadId || !sessionId || !question || !answer) {
+      edgeWarn(FN, 'bad_request', { hint: 'need lead_id, public_session_id, question, answer' })
       return jsonResponse(
         {
           error:
@@ -77,9 +84,18 @@ Deno.serve(async (req: Request) => {
       )
     }
 
+    edgeLog(FN, 'request_received', {
+      lead_id: leadId,
+      answer_chars: answer.length,
+      answer_preview: previewText(answer),
+      field_target_claim: body.field_target?.trim() || null,
+      question_preview: previewText(question),
+    })
+
     const supabase = createServiceClient()
     const lead = await fetchLeadVerified(supabase, leadId, sessionId)
     if (!lead) {
+      edgeWarn(FN, 'session_invalid_or_lead_missing', { lead_id: leadId })
       return jsonResponse({ error: 'Lead not found or session invalid' }, 403)
     }
 
@@ -89,6 +105,18 @@ Deno.serve(async (req: Request) => {
       kind: 'answer',
       question_text: question,
     })
+
+    const fieldTarget = body.field_target?.trim()
+    let clientFieldSynced = false
+    if (fieldTarget && isAllowedFieldKey(fieldTarget)) {
+      await upsertProfileFieldRow(supabase, leadId, fieldTarget, answer, 0.5)
+      clientFieldSynced = true
+    } else if (fieldTarget) {
+      edgeWarn(FN, 'field_target_not_allowed', {
+        lead_id: leadId,
+        field_target: fieldTarget,
+      })
+    }
 
     const { data: msgRows, error: msgErr } = await supabase
       .from('intake_messages')
@@ -106,6 +134,16 @@ Deno.serve(async (req: Request) => {
       .join('\n')
 
     const forcedDone = adaptiveAfterThis >= MAX_ADAPTIVE_ANSWERS
+
+    edgeLog(FN, 'context_before_llm', {
+      lead_id: leadId,
+      primary_type: primarySlug ?? lead.primary_type,
+      adaptive_turn_index_after_answer: adaptiveAfterThis,
+      max_adaptive: MAX_ADAPTIVE_ANSWERS,
+      forced_done: forcedDone,
+      profile_fields_filled_count: filledKeys.size,
+      client_field_target_written: clientFieldSynced,
+    })
 
     const llm = await callOpenAiJson<Record<string, unknown>>([
       { role: 'system', content: buildProcessSystemPrompt() },
@@ -127,6 +165,10 @@ Deno.serve(async (req: Request) => {
     const updatedFields: Record<string, unknown> = {}
     let rollup: number | null = lead.profile_confidence
     let parsedOut: ProcessIntakeLlmOut | null = null
+
+    if (!llm.ok) {
+      edgeWarn(FN, 'openai_process_failed', { reason_preview: previewText(llm.error) })
+    }
 
     if (llm.ok) {
       const pr = processIntakeLlmSchema.safeParse(llm.data)
@@ -162,6 +204,11 @@ Deno.serve(async (req: Request) => {
         }
         const m = meanConfidence(cf)
         rollup = m ?? rollup
+      } else {
+        edgeWarn(FN, 'process_llm_json_failed_schema', {
+          lead_id: leadId,
+          zod_issues: pr.error.issues.length,
+        })
       }
     }
 
@@ -170,10 +217,18 @@ Deno.serve(async (req: Request) => {
       profileSummary = profileSummary || lead.ai_summary || ''
     }
 
-    let nextQ = null
+    let nextQ: NextQuestion | null = null
+    let ladderExhaustedCompletion = false
+    let nextQuestionSource =
+      forcedDone ? 'skipped_max_adaptive_turns'
+      : parsedOut?.should_show_recommendations === true
+        ? 'skipped_llm_should_show_rec'
+      : 'pending_next_question_branch'
     if (!showRec) {
+      const filledAfter = await loadProfileFieldKeys(supabase, leadId)
       const nqRaw = parsedOut?.next_question
       if (usedLlm && nqRaw?.question) {
+        nextQuestionSource = 'process_llm_next_question_coerced'
         nextQ = coerceNextQuestion(
           {
             question: nqRaw.question,
@@ -184,20 +239,37 @@ Deno.serve(async (req: Request) => {
           },
           primarySlug,
         )
-      } else {
-        const filled = await loadProfileFieldKeys(supabase, leadId)
-        nextQ = pickFallbackQuestion(
-          primarySlug,
-          filled,
-          adaptiveAfterThis,
-        )
       }
-      await appendMessage(supabase, leadId, 'assistant', nextQ.question, {
-        kind: 'ai_question',
-        question_id: crypto.randomUUID(),
-        ...nextQ,
-      })
+      if (!nextQ) {
+        nextQuestionSource = 'static_ladder_fallback'
+        nextQ = pickFallbackQuestion(primarySlug, filledAfter)
+      }
+      if (!nextQ) {
+        showRec = true
+        ladderExhaustedCompletion = true
+        nextQuestionSource = 'ladder_complete_no_more_fallback'
+      } else {
+        await appendMessage(supabase, leadId, 'assistant', nextQ.question, {
+          kind: 'ai_question',
+          question_id: crypto.randomUUID(),
+          ...nextQ,
+        })
+      }
     }
+
+    edgeLog(FN, 'resolution', {
+      lead_id: leadId,
+      intake_complete: showRec,
+      completion_signals: {
+        max_turn_hit: forcedDone,
+        llm_ready:
+          !!(usedLlm && parsedOut?.should_show_recommendations === true),
+        ladder_exhausted: ladderExhaustedCompletion,
+      },
+      used_process_llm: usedLlm,
+      next_question_source: nextQuestionSource,
+      next_field_target: nextQ?.field_target ?? null,
+    })
 
     const leadUpdate: Record<string, unknown> = {
       ai_summary: profileSummary,
@@ -211,6 +283,8 @@ Deno.serve(async (req: Request) => {
 
     await supabase.from('leads').update(leadUpdate).eq('id', leadId)
 
+    edgeLog(FN, 'response_ok', { lead_id: leadId, intake_complete: showRec })
+
     return jsonResponse({
       updated_fields: updatedFields,
       profile_summary: profileSummary,
@@ -220,7 +294,7 @@ Deno.serve(async (req: Request) => {
       candidate_match_count: 0,
     })
   } catch (e) {
-    console.error(e)
+    edgeErrorObj(FN, 'unhandled_exception', e)
     return jsonResponse({ error: 'Internal error' }, 500)
   }
 })

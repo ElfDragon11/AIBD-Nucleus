@@ -9,7 +9,7 @@ export function inferPrimaryFromIntentText(raw: string): CanonicalLeadType | nul
   if (/\b(intern|student|byu\b|degree|studying\b|campus)\b/.test(t))
     return 'student_intern'
   if (
-    /\b(coo|cfo|cto|operations|fractional|part[- ]time|former exec|\bvp\b)\b/.test(t)
+    /\b(?:am\s+an?\s+executive|an?\s+executive\b|coo|cfo|cto|c[-\s]?suite|\bceo\b|\bpresident\b|\bvp\b|vice\s+president|c[-\s]level\b|fractional|chief\b|former\s+exec|\bhead\s+of\b|opportunit(?:y|ies)\s+to\s+help\b|oppurtunit(?:y|ies)\s+to\s+help\b|(?:help|support)\s+(?:startup|teams?)\b)/.test(t)
   )
     return 'operator_executive'
   if (/\b(raise|seed|fund|investor|angel|venture|check size)\b/.test(t))

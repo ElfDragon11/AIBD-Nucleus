@@ -1,9 +1,11 @@
 import * as React from 'react'
 
 import { useMutation } from '@tanstack/react-query'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 
+import { PublicSiteHeader } from '@/components/brand/PublicSiteHeader'
 import { IdentityStep } from '@/features/intake/IdentityStep'
+import { IntakeStepFrame } from '@/features/intake/IntakeStepFrame'
 import { ProgressIndicator } from '@/features/intake/ProgressIndicator'
 import { createPublicLead } from '@/features/intake/publicLeadApi'
 import {
@@ -12,6 +14,7 @@ import {
   saveIntakeSession,
 } from '@/features/intake/publicSession'
 import type { IdentityFormValues } from '@/features/intake/schemas'
+import { runWithViewTransition } from '@/lib/viewTransition'
 
 export function IntakeStartPage() {
   const navigate = useNavigate()
@@ -47,7 +50,9 @@ export function IntakeStartPage() {
       return id
     },
     onSuccess: (id) => {
-      navigate(`/intake/${id}`)
+      runWithViewTransition(() => {
+        navigate(`/intake/${id}`)
+      })
     },
   })
 
@@ -62,24 +67,20 @@ export function IntakeStartPage() {
   }
 
   return (
-    <div className="min-h-svh bg-background">
-      <div className="border-b border-border/80 bg-card/90 px-4 py-6 sm:px-8">
-        <div className="mx-auto flex max-w-6xl justify-between gap-4">
-          <Link
-            to="/"
-            className="font-serif text-lg tracking-tight text-foreground underline-offset-4 hover:underline"
-          >
-            Nucleus Concierge
-          </Link>
-        </div>
-      </div>
+    <div className="min-h-svh bg-secondary">
+      <PublicSiteHeader />
       <div className="mx-auto max-w-6xl px-4 py-10 sm:px-8">
-        <div className="space-y-8">
+        <div className="mx-auto w-full max-w-md space-y-8">
           <ProgressIndicator current={2} />
-          <IdentityStep
-            submitting={createMutation.isPending}
-            onSubmit={(v) => createMutation.mutate(v)}
-          />
+          <IntakeStepFrame
+            key="intake-identity"
+            className="w-full bg-background p-6 sm:p-8"
+          >
+            <IdentityStep
+              submitting={createMutation.isPending}
+              onSubmit={(v) => createMutation.mutate(v)}
+            />
+          </IntakeStepFrame>
           {createMutation.isError ? (
             <p className="text-sm text-destructive">
               We could not reach Supabase yet. Confirm environment keys and network,

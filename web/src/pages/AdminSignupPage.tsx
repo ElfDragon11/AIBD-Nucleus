@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { z } from 'zod'
 
+import { BrandMark } from '@/components/brand/BrandMark'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -103,7 +104,8 @@ export function AdminSignupPage() {
   if (session) return <Navigate to="/admin" replace />
 
   return (
-    <div className="flex min-h-svh flex-col items-center justify-center bg-background px-4">
+    <div className="flex min-h-svh flex-col items-center justify-center bg-secondary px-4 py-10">
+      <BrandMark className="mb-8" />
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle>Create admin account</CardTitle>

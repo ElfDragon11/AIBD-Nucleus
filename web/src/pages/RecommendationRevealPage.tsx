@@ -3,16 +3,22 @@ import * as React from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, Navigate, useParams } from 'react-router-dom'
 
+import { PublicSiteHeader } from '@/components/brand/PublicSiteHeader'
 import { Skeleton } from '@/components/ui/skeleton'
-import { RecommendationReveal } from '@/features/intake/RecommendationReveal'
+import { FindingMatchesLoader } from '@/features/intake/FindingMatchesLoader'
+import { findMatchesEdge } from '@/features/intake/intakeEdgeApi'
 import { inferMockPrimaryType } from '@/features/intake/mockClassify'
-import { getMockRecommendationCards } from '@/features/intake/mockRecommendations'
-import { pkLead, pkMsgs } from '@/features/intake/queryKeys'
+import { getMockRecommendationCards, matchRpcRowToCard } from '@/features/intake/mockRecommendations'
+import { getMockQuestionsForPrimaryType } from '@/features/intake/mockIntakeDriver'
+import { countAnsweredQuestions } from '@/features/intake/messageUtils'
+import { pkLead, pkMatch, pkMsgs } from '@/features/intake/queryKeys'
 import {
   fetchLeadForSession,
   listIntakeMessages,
+  listMatchRecordsForSession,
   updatePublicLead,
 } from '@/features/intake/publicLeadApi'
+import { RecommendationReveal } from '@/features/intake/RecommendationReveal'
 import { getStoredIntakeSession } from '@/features/intake/publicSession'
 
 export function RecommendationRevealPage() {
@@ -37,6 +43,46 @@ export function RecommendationRevealPage() {
     enabled: routingOk && !!leadQuery.data,
   })
 
+  const leadRow = leadQuery.data ?? null
+
+  const primary =
+    leadRow?.primary_type ?? inferMockPrimaryType(leadRow?.raw_intent ?? '')
+  const questionList = getMockQuestionsForPrimaryType(primary)
+  const answered = countAnsweredQuestions(messagesQuery.data ?? [])
+
+  const intakeFlowComplete =
+    !!leadRow?.raw_intent?.trim() &&
+    questionList.length > 0 &&
+    answered >= questionList.length
+
+  const recommendationsGate =
+    intakeFlowComplete || leadRow?.status === 'recommendations_shown'
+
+  const matchQuery = useQuery({
+    queryKey: pkMatch(id, sid),
+    queryFn: async () => {
+      let rows = await listMatchRecordsForSession(id, sid)
+      if (rows.length > 0) return rows
+
+      const leadCheck = await fetchLeadForSession(id, sid)
+      if (
+        leadCheck?.status !== 'intake_complete' &&
+        leadCheck?.status !== 'recommendations_shown'
+      ) {
+        return rows
+      }
+
+      await findMatchesEdge({ lead_id: id, public_session_id: sid, limit: 4 })
+      rows = await listMatchRecordsForSession(id, sid)
+      return rows
+    },
+    enabled:
+      routingOk &&
+      leadQuery.isSuccess &&
+      messagesQuery.isSuccess &&
+      recommendationsGate,
+  })
+
   React.useEffect(() => {
     if (
       !routingOk ||
@@ -47,9 +93,16 @@ export function RecommendationRevealPage() {
       return
     }
 
-    const leadRow = leadQuery.data
+    const lr = leadQuery.data
 
-    if (leadRow.status !== 'intake_complete') return
+    const qsLen = getMockQuestionsForPrimaryType(
+      lr.primary_type ?? inferMockPrimaryType(lr.raw_intent ?? ''),
+    ).length
+    const ans = countAnsweredQuestions(messagesQuery.data)
+    const flowReady =
+      !!lr.raw_intent?.trim() && qsLen > 0 && ans >= qsLen
+
+    if (!flowReady || lr.status !== 'intake_complete') return
 
     void updatePublicLead({
       leadId: id,
@@ -59,6 +112,7 @@ export function RecommendationRevealPage() {
       Promise.all([
         qc.invalidateQueries({ queryKey: pkLead(id, sid) }),
         qc.invalidateQueries({ queryKey: pkMsgs(id, sid) }),
+        qc.invalidateQueries({ queryKey: pkMatch(id, sid) }),
       ]).catch(() => undefined),
     )
   }, [
@@ -102,39 +156,49 @@ export function RecommendationRevealPage() {
     )
   }
 
-  const intakeFlowComplete =
-    lead.status === 'intake_complete' ||
-    lead.status === 'recommendations_shown'
+  const primarySlug =
+    lead.primary_type ?? inferMockPrimaryType(lead.raw_intent ?? '')
+  const qs = getMockQuestionsForPrimaryType(primarySlug)
+  const ansCount = countAnsweredQuestions(messagesQuery.data ?? [])
 
-  if (!intakeFlowComplete) {
+  const intakeDone =
+    !!lead.raw_intent?.trim() &&
+    qs.length > 0 &&
+    ansCount >= qs.length
+
+  if (!(intakeDone || lead.status === 'recommendations_shown')) {
     return <Navigate replace to={`/intake/${leadId}`} />
   }
 
-  const primary =
-    lead.primary_type ?? inferMockPrimaryType(lead.raw_intent ?? '')
+  if (matchQuery.isPending) {
+    return <FindingMatchesLoader />
+  }
 
-  const cards = getMockRecommendationCards(primary)
+  if (matchQuery.isError) {
+    return (
+      <div className="flex min-h-svh flex-col items-center justify-center gap-4 px-6 text-center">
+        <p className="font-serif text-xl">We couldn&apos;t load recommendations.</p>
+        <Link className="text-sm underline" to={`/intake/${leadId}`}>
+          Back to intake
+        </Link>
+      </div>
+    )
+  }
+
+  const rpcCards = (matchQuery.data ?? []).map(matchRpcRowToCard)
+  const cards =
+    rpcCards.length > 0 ? rpcCards : getMockRecommendationCards(primarySlug)
 
   return (
-    <div className="min-h-svh bg-background">
-      <div className="border-b border-border/80 bg-card/90 px-4 py-5 sm:px-8">
-        <div className="mx-auto flex max-w-4xl justify-between gap-6">
-          <Link
-            to="/"
-            className="font-serif text-lg underline-offset-4 hover:underline"
-          >
-            Home
-          </Link>
-          <Link
-            className="text-sm text-muted-foreground underline-offset-4 hover:underline hover:text-foreground"
-            to="/intake?fresh=1"
-          >
-            Start another intake
-          </Link>
-        </div>
-      </div>
-      <div className="mx-auto max-w-4xl px-4 py-12 sm:px-8">
-        <RecommendationReveal lead={lead} items={cards} />
+    <div className="min-h-svh bg-secondary">
+      <PublicSiteHeader />
+      <div className="mx-auto max-w-4xl px-4 py-12 sm:px-8 animate-in fade-in slide-in-from-bottom-2 duration-500 ease-out fill-mode-both">
+        <RecommendationReveal
+          lead={lead}
+          items={cards}
+          leadId={id}
+          publicSessionId={sid}
+        />
       </div>
     </div>
   )

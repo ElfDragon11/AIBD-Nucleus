@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { z } from 'zod'
 
+import { BrandMark } from '@/components/brand/BrandMark'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -74,12 +75,13 @@ export function AdminLoginPage() {
   if (session) return <Navigate to="/admin" replace />
 
   return (
-    <div className="flex min-h-svh flex-col items-center justify-center bg-background px-4">
+    <div className="flex min-h-svh flex-col items-center justify-center bg-secondary px-4 py-10">
+      <BrandMark className="mb-8" />
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle>Admin sign in</CardTitle>
           <CardDescription>
-            Nucleus Concierge · staff access via Supabase Auth
+            Nucleus Concierge contact CRM
           </CardDescription>
         </CardHeader>
         <form onSubmit={form.handleSubmit(onSubmit)}>
@@ -156,7 +158,7 @@ export function AdminLoginPage() {
               className="text-center text-xs text-muted-foreground underline-offset-4 hover:underline"
               to="/"
             >
-              ← Back to concierge home
+              ← Back to home
             </Link>
           </CardFooter>
         </form>

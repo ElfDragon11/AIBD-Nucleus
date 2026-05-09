@@ -24,14 +24,17 @@ export function IntentStep({ submitting, onSubmit }: Props): JSX.Element {
 
   return (
     <form
-      className="mx-auto flex w-full max-w-xl flex-col gap-5"
+      className="flex w-full flex-col gap-5"
       onSubmit={form.handleSubmit(onSubmit)}
       noValidate
     >
       <div className="text-left">
+        <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-[var(--nucleus-blue)]">
+          Your goal
+        </p>
         <h2
           id="intent-heading"
-          className="font-serif text-2xl tracking-tight sm:text-3xl"
+          className="font-serif text-2xl font-medium tracking-tight sm:text-3xl"
         >
           What brings you to Nucleus?
         </h2>

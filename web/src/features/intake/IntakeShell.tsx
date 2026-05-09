@@ -5,8 +5,10 @@ import { Loader2Icon } from 'lucide-react'
 
 import { Link, useNavigate } from 'react-router-dom'
 
+import { PublicSiteHeader } from '@/components/brand/PublicSiteHeader'
 import { Skeleton } from '@/components/ui/skeleton'
 
+import { IntakeStepFrame } from '@/features/intake/IntakeStepFrame'
 import { IntentStep } from '@/features/intake/IntentStep'
 import {
   classifyLeadEdge,
@@ -27,6 +29,7 @@ import {
 } from '@/features/intake/publicLeadApi'
 
 import { pkLead, pkMsgs } from '@/features/intake/queryKeys'
+import { runWithViewTransition } from '@/lib/viewTransition'
 
 type Props = {
   leadId: string
@@ -90,18 +93,24 @@ export function IntakeShell({ leadId, session }: Props) {
     mutationFn: async (vars: {
       questionText: string
       combinedAnswer: string
+      fieldTarget?: string
     }) => {
       const result = await processIntakeAnswerEdge({
         lead_id: leadId,
         public_session_id: session.publicSessionId,
         question: vars.questionText,
         answer: vars.combinedAnswer,
+        ...(vars.fieldTarget != null && vars.fieldTarget !== ''
+          ? { field_target: vars.fieldTarget }
+          : {}),
       })
       return result
     },
     onSuccess: async (data) => {
       if (data.should_show_recommendations) {
-        navigate(`/recommendations/${leadId}`)
+        runWithViewTransition(() => {
+          navigate(`/recommendations/${leadId}`)
+        })
       }
       await invalidateSession()
     },
@@ -114,7 +123,9 @@ export function IntakeShell({ leadId, session }: Props) {
       (lead.status === 'intake_complete' ||
         lead.status === 'recommendations_shown')
     ) {
-      navigate(`/recommendations/${leadId}`, { replace: true })
+      runWithViewTransition(() => {
+        navigate(`/recommendations/${leadId}`, { replace: true })
+      })
     }
   }, [leadQuery.data?.status, leadId, navigate, leadQuery.data])
 
@@ -135,11 +146,38 @@ export function IntakeShell({ leadId, session }: Props) {
         ? 4
         : 4
 
+  const leadLoaded = maybeLead ?? null
+
+  const awaitingNextQuestion =
+    !!leadLoaded?.raw_intent?.trim() &&
+    lastMsg?.sender === 'user' &&
+    !answerMutation.isPending &&
+    !intentMutation.isPending &&
+    !trailingQuestion
+
+  const intakeStepKey = React.useMemo(() => {
+    if (leadQuery.isPending) return 'loading'
+    if (!leadLoaded) return 'unavailable'
+    if (!leadLoaded.raw_intent?.trim()) {
+      return intentMutation.isPending ? 'intent-sending' : 'intent-open'
+    }
+    if (intentMutation.isPending) return 'intent-classifying'
+    if (trailingQuestion) return `question-${trailingQuestion.id}`
+    if (awaitingNextQuestion) return 'assistant-typing'
+    if (answerMutation.isPending) return 'answer-saving'
+    return 'question-loading'
+  }, [
+    answerMutation.isPending,
+    awaitingNextQuestion,
+    intentMutation.isPending,
+    leadLoaded,
+    leadQuery.isPending,
+    trailingQuestion?.id,
+  ])
+
   if (leadQuery.isPending) {
     return <IntakeLoadingShell />
   }
-
-  const leadLoaded = maybeLead ?? null
 
   if (!leadLoaded) {
     return (
@@ -149,68 +187,69 @@ export function IntakeShell({ leadId, session }: Props) {
     )
   }
 
-  const awaitingNextQuestion =
-    !!leadLoaded.raw_intent?.trim() &&
-    lastMsg?.sender === 'user' &&
-    !answerMutation.isPending &&
-    !intentMutation.isPending &&
-    !trailingQuestion
-
   return (
-    <div className="min-h-svh bg-background">
-      <div className="border-b border-border/80 bg-card/90">
-        <div className="mx-auto flex max-w-3xl px-4 py-6 sm:px-6">
-          <Link
-            to="/"
-            className="font-serif text-lg tracking-tight text-foreground underline-offset-4 hover:underline"
-          >
-            Nucleus Concierge
-          </Link>
-        </div>
-      </div>
+    <div className="min-h-svh bg-secondary">
+      <PublicSiteHeader />
 
-      <div className="mx-auto max-w-3xl space-y-8 px-4 py-10 sm:px-6">
-        <div className="space-y-8">
+      <div className="mx-auto w-full max-w-md px-4 py-10 sm:px-6">
+        <div className="space-y-8 bg-background p-6 sm:p-8">
           <ProgressIndicator current={progressPhase} />
 
-          {!leadLoaded.raw_intent?.trim() ? (
-            <IntentStep
-              submitting={intentMutation.isPending}
-              onSubmit={(v) => intentMutation.mutate(v.raw_intent)}
-            />
-          ) : intentMutation.isPending ? (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Loader2Icon className="size-4 animate-spin" />
-              Reading what you shared…
-            </div>
-          ) : trailingQuestion ? (
-            <QuestionCard
-              key={trailingQuestion.id}
-              question={trailingQuestion}
-              submitting={answerMutation.isPending}
-              onContinue={(body) => {
-                answerMutation.mutate({
-                  questionText: trailingQuestion.question,
-                  combinedAnswer: body,
-                })
-              }}
-            />
-          ) : awaitingNextQuestion ? (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Loader2Icon className="size-4 animate-spin" />
-              Updating your concierge session…
-            </div>
-          ) : answerMutation.isPending ? (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Loader2Icon className="size-4 animate-spin" />
-              Saving your answer…
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Loader2Icon className="size-4 animate-spin" />
-              Preparing the next question…
-            </div>
-          )}
+          <div className="min-h-[min(70vh,28rem)]">
+            <IntakeStepFrame key={intakeStepKey} className="w-full">
+              {!leadLoaded.raw_intent?.trim() ? (
+                <IntentStep
+                  submitting={intentMutation.isPending}
+                  onSubmit={(v) => intentMutation.mutate(v.raw_intent)}
+                />
+              ) : intentMutation.isPending ? (
+                <div className="flex w-full flex-col gap-8">
+                  <SubmittedGoalPanel text={leadLoaded.raw_intent.trim()} />
+                  <ThinkingIndicator
+                    title="Reading what you shared…"
+                    description="We’re reviewing your goal and lining up smart follow-ups. This usually takes a few seconds."
+                  />
+                </div>
+              ) : trailingQuestion ? (
+                <QuestionCard
+                  key={trailingQuestion.id}
+                  question={trailingQuestion}
+                  submitting={answerMutation.isPending}
+                  onContinue={(body) => {
+                    answerMutation.mutate({
+                      questionText: trailingQuestion.question,
+                      combinedAnswer: body,
+                      fieldTarget: trailingQuestion.fieldTarget,
+                    })
+                  }}
+                />
+              ) : awaitingNextQuestion ? (
+                <div className="flex w-full flex-col gap-8">
+                  <SubmittedGoalPanel text={leadLoaded.raw_intent.trim()} />
+                  <ThinkingIndicator
+                    title="Thinking for a moment…"
+                    description="We’re using what you shared to shape the next question."
+                  />
+                </div>
+              ) : answerMutation.isPending ? (
+                <div className="flex w-full flex-col gap-8">
+                  <SubmittedGoalPanel text={leadLoaded.raw_intent.trim()} />
+                  <ThinkingIndicator
+                    title="Saving your answer…"
+                    description="Hang tight — we’re updating your intake."
+                  />
+                </div>
+              ) : (
+                <div className="flex w-full flex-col gap-8">
+                  <SubmittedGoalPanel text={leadLoaded.raw_intent.trim()} />
+                  <ThinkingIndicator
+                    title="Preparing the next question…"
+                    description="Almost there — deciding what to ask next based on your goal."
+                  />
+                </div>
+              )}
+            </IntakeStepFrame>
+          </div>
 
           {intentMutation.isError || answerMutation.isError ? (
             <p className="text-sm text-destructive">
@@ -221,6 +260,47 @@ export function IntakeShell({ leadId, session }: Props) {
             </p>
           ) : null}
         </div>
+      </div>
+    </div>
+  )
+}
+
+function SubmittedGoalPanel({ text }: { text: string }) {
+  return (
+    <div className="w-full text-left">
+      <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-[var(--nucleus-blue)]">
+        Your goal
+      </p>
+      <h2 className="mb-4 font-serif text-2xl font-medium tracking-tight sm:text-3xl">
+        What brings you to Nucleus?
+      </h2>
+      <blockquote className="rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm leading-relaxed text-foreground sm:text-base">
+        {text}
+      </blockquote>
+    </div>
+  )
+}
+
+function ThinkingIndicator({
+  title,
+  description,
+}: {
+  title: string
+  description: string
+}) {
+  return (
+    <div
+      className="flex w-full min-h-[10rem] flex-col justify-center gap-4 rounded-lg border border-dashed border-border/90 bg-muted/25 px-4 py-5 sm:min-h-[9rem] sm:flex-row sm:items-center sm:gap-5"
+      role="status"
+      aria-live="polite"
+    >
+      <Loader2Icon
+        className="size-8 shrink-0 animate-spin text-[var(--nucleus-blue)]"
+        aria-hidden
+      />
+      <div className="min-w-0 space-y-1.5 text-left">
+        <p className="font-medium text-foreground">{title}</p>
+        <p className="text-sm leading-snug text-muted-foreground">{description}</p>
       </div>
     </div>
   )
